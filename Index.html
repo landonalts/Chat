@@ -1,140 +1,50 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>School Chat</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <style>
-    body { font-family: Arial; background:#111; color:#fff; }
-    button { padding:8px; margin:5px; }
-    #chat { display:none; }
-  </style>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-<h2>School Chat</h2>
-
 <div id="login">
-  <button onclick="googleLogin()">Sign in with Google</button>
+  <h1>School Chat</h1>
+  <input id="usernameInput" placeholder="Choose a username">
+  <button id="loginBtn">Enter</button>
+  <p id="loginError"></p>
 </div>
 
-<div id="usernameBox" style="display:none">
-  <input id="usernameInput" placeholder="Choose username">
-  <button onclick="saveUsername()">Continue</button>
-  <p id="nameError"></p>
+<div id="app" hidden>
+  <aside id="sidebar">
+    <h2 id="me"></h2>
+
+    <div class="tab active" data-room="general"># General</div>
+    <div class="tab" data-room="homework"># Homework</div>
+
+    <h3>Users</h3>
+    <div id="userList"></div>
+
+    <h3>Friends</h3>
+    <div id="friendsList"></div>
+
+    <button id="adminBtn" hidden>Admin</button>
+  </aside>
+
+  <main>
+    <header id="roomTitle"># general</header>
+    <div id="messages"></div>
+
+    <div id="inputBar">
+      <input id="msgInput" placeholder="Message">
+      <button id="sendBtn">Send</button>
+    </div>
+  </main>
 </div>
 
-<div id="chat">
-  <button onclick="switchRoom('general')">General</button>
-  <button onclick="switchRoom('homework')">Homework</button>
+<div id="dmContainer"></div>
 
-  <div id="messages"></div>
-
-  <input id="msg" placeholder="Message">
-  <button onclick="send()">Send</button>
-</div>
-
-<script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getAuth, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-import { getFirestore, doc, getDoc, setDoc, collection, addDoc, query, orderBy, onSnapshot, where, getDocs, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-
-const firebaseConfig = {
-  apiKey: "AIzaSyBDvT2rZPyA5n129hLS8stC-Xns4XLJLao",
-  authDomain: "school-chat-173.firebaseapp.com",
-  projectId: "school-chat-173",
-  storageBucket: "school-chat-173.firebasestorage.app",
-  messagingSenderId: "307920162706",
-  appId: "1:307920162706:web:45f2c7299945d613417b4b"
-};
-
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
-
-let user, username, currentRoom = "general", unsub;
-
-window.googleLogin = async () => {
-  const provider = new GoogleAuthProvider();
-  const res = await signInWithPopup(auth, provider);
-  user = res.user;
-
-  const userDoc = await getDoc(doc(db,"users",user.uid));
-  if (!userDoc.exists()) {
-    usernameBox.style.display = "block";
-  } else {
-    username = userDoc.data().username;
-    startChat();
-  }
-};
-
-async function isNameTaken(name) {
-  const q = query(collection(db,"users"), where("username","==",name));
-  return !(await getDocs(q)).empty;
-}
-
-window.saveUsername = async () => {
-  const name = usernameInput.value.trim();
-  if (!name) return;
-
-  if (await isNameTaken(name)) {
-    nameError.textContent = "Username taken";
-    return;
-  }
-
-  await setDoc(doc(db,"users",user.uid), {
-    username: name,
-    banned: false,
-    isAdmin: false
-  });
-
-  username = name;
-  startChat();
-};
-
-function startChat() {
-  login.style.display = "none";
-  usernameBox.style.display = "none";
-  chat.style.display = "block";
-  switchRoom("general");
-}
-
-window.switchRoom = (room) => {
-  if (unsub) unsub();
-  currentRoom = room;
-
-  const q = query(
-    collection(db,"chats",room,"messages"),
-    orderBy("time")
-  );
-
-  unsub = onSnapshot(q, snap => {
-    messages.innerHTML = "";
-    snap.forEach(d => {
-      messages.innerHTML += `<p><b>${d.data().user}</b>: ${d.data().text}</p>`;
-    });
-  });
-};
-
-const bannedWords = ["fuck","shit","nigger","nigga","bitch"];
-
-function censor(t) {
-  let x = t.toLowerCase();
-  bannedWords.forEach(w => x = x.replaceAll(w,"****"));
-  return x;
-}
-
-window.send = async () => {
-  const text = msg.value.trim();
-  if (!text) return;
-
-  await addDoc(collection(db,"chats",currentRoom,"messages"), {
-    user: username,
-    text: censor(text),
-    time: serverTimestamp()
-  });
-
-  msg.value = "";
-};
-</script>
+<script type="module" src="firebase.js"></script>
+<script type="module" src="app.js"></script>
 </body>
 </html>
