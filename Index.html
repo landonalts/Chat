@@ -1,50 +1,311 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>School Chat</title>
-  <link rel="stylesheet" href="style.css">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>School Chat</title>
+
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
+<style>
+* { box-sizing: border-box; font-family: system-ui; }
+
+body {
+  margin: 0;
+  background: #0f172a;
+  color: #e5e7eb;
+  height: 100vh;
+}
+
+#login {
+  max-width: 360px;
+  margin: 20vh auto;
+  background: #020617;
+  padding: 25px;
+  border-radius: 14px;
+}
+
+input, button {
+  width: 100%;
+  padding: 12px;
+  margin-top: 10px;
+  border-radius: 8px;
+  border: none;
+}
+
+input {
+  background: #020617;
+  color: white;
+  border: 1px solid #334155;
+}
+
+button {
+  background: #2563eb;
+  color: white;
+  font-weight: bold;
+}
+
+#error { color: #f87171; }
+
+#app {
+  display: none;
+  height: 100vh;
+}
+
+#sidebar {
+  width: 260px;
+  background: #020617;
+  padding: 15px;
+  overflow-y: auto;
+}
+
+.room {
+  padding: 10px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.room.active { background: #2563eb; }
+
+.user {
+  padding: 6px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.user:hover { background: #1e293b; }
+
+#chat {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+#messages {
+  flex: 1;
+  padding: 15px;
+  overflow-y: auto;
+}
+
+.msg { margin-bottom: 8px; }
+
+#inputBar {
+  display: flex;
+  padding: 10px;
+  background: #020617;
+}
+
+#inputBar input { flex: 1; }
+
+.dm {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  width: 280px;
+  background: #020617;
+  border-radius: 12px;
+  padding: 10px;
+  box-shadow: 0 0 20px rgba(0,0,0,.5);
+}
+
+.dm h4 {
+  margin: 0 0 5px 0;
+}
+
+.dmMsgs {
+  height: 160px;
+  overflow-y: auto;
+  font-size: 14px;
+}
+
+.dm input {
+  margin-top: 5px;
+}
+</style>
 </head>
+
 <body>
 
 <div id="login">
-  <h1>School Chat</h1>
-  <input id="usernameInput" placeholder="Choose a username">
-  <button id="loginBtn">Enter</button>
-  <p id="loginError"></p>
+  <h2>School Chat</h2>
+  <input id="usernameInput" placeholder="Choose username">
+  <button onclick="login()">Enter</button>
+  <p id="error"></p>
 </div>
 
-<div id="app" hidden>
-  <aside id="sidebar">
-    <h2 id="me"></h2>
+<div id="app">
+  <div id="sidebar">
+    <h3 id="me"></h3>
 
-    <div class="tab active" data-room="general"># General</div>
-    <div class="tab" data-room="homework"># Homework</div>
+    <div class="room active" onclick="switchRoom('general')"># General</div>
+    <div class="room" onclick="switchRoom('homework')"># Homework</div>
 
-    <h3>Users</h3>
-    <div id="userList"></div>
+    <h4>Users</h4>
+    <div id="users"></div>
 
-    <h3>Friends</h3>
-    <div id="friendsList"></div>
+    <div id="adminPanel" style="display:none;">
+      <input id="banInput" placeholder="Ban username">
+      <button onclick="ban()">Ban</button>
+    </div>
+  </div>
 
-    <button id="adminBtn" hidden>Admin</button>
-  </aside>
-
-  <main>
-    <header id="roomTitle"># general</header>
+  <div id="chat">
     <div id="messages"></div>
-
     <div id="inputBar">
       <input id="msgInput" placeholder="Message">
-      <button id="sendBtn">Send</button>
+      <button onclick="send()">Send</button>
     </div>
-  </main>
+  </div>
 </div>
 
-<div id="dmContainer"></div>
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyBDvT2rZPyA5n129hLS8stC-Xns4XLJLao",
+  authDomain: "school-chat-173.firebaseapp.com",
+  projectId: "school-chat-173",
+  storageBucket: "school-chat-173.firebasestorage.app",
+  messagingSenderId: "307920162706",
+  appId: "1:307920162706:web:45f2c7299945d613417b4b"
+};
 
-<script type="module" src="firebase.js"></script>
-<script type="module" src="app.js"></script>
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+const badWords = ["fuck","shit","bitch","nigger"];
+const censor = t => badWords.reduce(
+  (a,w)=>a.replace(new RegExp(w,"gi"),"****"), t
+);
+
+let username = localStorage.getItem("username");
+let room = "general";
+
+async function login() {
+  const u = usernameInput.value.trim();
+  if (!u) return;
+
+  const banned = await db.collection("bans").doc(u).get();
+  if (banned.exists) {
+    error.textContent = "You are banned.";
+    return;
+  }
+
+  const snap = await db.collection("users").doc(u).get();
+  if (snap.exists) {
+    error.textContent = "Username taken";
+    return;
+  }
+
+  await db.collection("users").doc(u).set({ joined: Date.now() });
+  localStorage.setItem("username", u);
+  location.reload();
+}
+
+if (username) {
+  login.style.display = "none";
+  app.style.display = "flex";
+  me.textContent = username;
+
+  if (username === "admin") adminPanel.style.display = "block";
+
+  db.collection("users").onSnapshot(s => {
+    users.innerHTML = "";
+    s.forEach(d => {
+      if (d.id === username) return;
+      const div = document.createElement("div");
+      div.className = "user";
+      div.textContent = d.id;
+      div.onclick = () => openDM(d.id);
+      users.appendChild(div);
+    });
+  });
+
+  loadRoom();
+}
+
+function switchRoom(r) {
+  room = r;
+  document.querySelectorAll(".room").forEach(x=>x.classList.remove("active"));
+  event.target.classList.add("active");
+  loadRoom();
+}
+
+function loadRoom() {
+  db.collection("messages")
+    .where("room","==",room)
+    .orderBy("time")
+    .onSnapshot(s => {
+      messages.innerHTML = "";
+      s.forEach(d => {
+        const m = d.data();
+        messages.innerHTML += `<div class="msg"><b>${m.user}</b>: ${m.text}</div>`;
+      });
+    });
+}
+
+function send() {
+  const text = censor(msgInput.value.trim());
+  if (!text) return;
+
+  db.collection("messages").add({
+    user: username,
+    text,
+    room,
+    time: firebase.firestore.FieldValue.serverTimestamp()
+  });
+
+  msgInput.value = "";
+}
+
+function openDM(other) {
+  if (document.getElementById("dm-"+other)) return;
+
+  const dm = document.createElement("div");
+  dm.className = "dm";
+  dm.id = "dm-"+other;
+
+  dm.innerHTML = `
+    <h4>${other} <span style="float:right;cursor:pointer" onclick="this.parentNode.parentNode.remove()">✕</span></h4>
+    <div class="dmMsgs"></div>
+    <input placeholder="DM..." onkeydown="if(event.key==='Enter') sendDM('${other}', this)">
+  `;
+
+  document.body.appendChild(dm);
+
+  const chatId = [username, other].sort().join("_");
+  db.collection("privateChats").doc(chatId).collection("messages")
+    .orderBy("time")
+    .onSnapshot(s => {
+      const box = dm.querySelector(".dmMsgs");
+      box.innerHTML = "";
+      s.forEach(d=>{
+        const m=d.data();
+        box.innerHTML += `<div><b>${m.user}</b>: ${m.text}</div>`;
+      });
+    });
+}
+
+function sendDM(other, input) {
+  const text = censor(input.value.trim());
+  if (!text) return;
+
+  const chatId = [username, other].sort().join("_");
+  db.collection("privateChats").doc(chatId).collection("messages").add({
+    user: username,
+    text,
+    time: firebase.firestore.FieldValue.serverTimestamp()
+  });
+
+  input.value = "";
+}
+
+function ban() {
+  const u = banInput.value.trim();
+  if (!u) return;
+  db.collection("bans").doc(u).set({ banned:true });
+  alert(u + " banned");
+}
+</script>
 </body>
 </html>
