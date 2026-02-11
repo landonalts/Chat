@@ -1,0 +1,106 @@
+* {
+  box-sizing: border-box;
+  font-family: system-ui, -apple-system;
+}
+
+body {
+  margin: 0;
+  background: #0f172a;
+  color: #e5e7eb;
+  height: 100vh;
+}
+
+#login {
+  max-width: 350px;
+  margin: 20vh auto;
+  background: #020617;
+  padding: 25px;
+  border-radius: 14px;
+}
+
+input, button {
+  width: 100%;
+  padding: 12px;
+  margin-top: 10px;
+  border-radius: 8px;
+  border: none;
+}
+
+input {
+  background: #020617;
+  color: white;
+  border: 1px solid #334155;
+}
+
+button {
+  background: #2563eb;
+  color: white;
+  font-weight: bold;
+}
+
+#error {
+  color: #f87171;
+}
+
+#app {
+  display: none;
+  height: 100vh;
+}
+
+#sidebar {
+  width: 260px;
+  background: #020617;
+  padding: 15px;
+  overflow-y: auto;
+}
+
+.room {
+  padding: 10px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.room.active {
+  background: #2563eb;
+}
+
+.user {
+  padding: 6px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.user:hover {
+  background: #1e293b;
+}
+
+#chat {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+#messages {
+  flex: 1;
+  padding: 15px;
+  overflow-y: auto;
+}
+
+.msg {
+  margin-bottom: 8px;
+}
+
+#inputBar {
+  display: flex;
+  padding: 10px;
+  background: #020617;
+}
+
+#inputBar input {
+  flex: 1;
+}
+
+#adminPanel {
+  display: none;
+  margin-top: 10px;
+}
